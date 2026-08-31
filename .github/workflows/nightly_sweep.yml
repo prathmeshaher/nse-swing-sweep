@@ -1,0 +1,57 @@
+name: Nightly NSE Swing Scan
+
+on:
+  # Lets you click "Run workflow" in the Actions tab to test before trusting
+  # the schedule.
+  workflow_dispatch: {}
+  schedule:
+    # 11:45 UTC = 5:15pm IST, Monday-Friday: after the 3:30pm IST close, with
+    # a buffer for the day's candle to be available. GitHub Actions cron is
+    # UTC-only and best-effort (can run late under platform load) -- treat
+    # this as "sometime after close," not a precise trigger time.
+    - cron: "45 11 * * 1-5"
+
+# Needed so the job can commit data/state.json (and data/history/) back to
+# the repo. If your org enforces read-only default GITHUB_TOKEN permissions
+# at the organization level, this line alone won't be enough -- see
+# SETUP.md's troubleshooting section.
+permissions:
+  contents: write
+
+concurrency:
+  group: nightly-sweep
+  # Never cancel a run partway through a 500-symbol sweep just because a
+  # newer one was triggered (e.g. a manual test run while the schedule was
+  # also about to fire).
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install -r requirements.txt
+
+      - name: Run nightly sweep
+        env:
+          # Both optional and unset by default -- position-sizing fields in
+          # the output stay null until these are set. Configure as repository
+          # Variables (Settings -> Secrets and variables -> Actions ->
+          # Variables) if you want them; see SETUP.md.
+          SWING_ACCOUNT_SIZE: ${{ vars.SWING_ACCOUNT_SIZE }}
+          SWING_RISK_PER_TRADE_PCT: ${{ vars.SWING_RISK_PER_TRADE_PCT }}
+        run: python scripts/rotation_sweep_v3_full500.py
+
+      - name: Commit updated state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/state.json data/history/
+          git diff --staged --quiet || git commit -m "Nightly sweep: $(date -u +'%Y-%m-%d')"
+          git push

@@ -1,0 +1,8 @@
+{
+  "universe": [
+    {"symbol": "RELIANCE", "isin": "INE002A01018", "sector": "ENERGY"},
+    {"symbol": "TCS", "isin": "INE467B01029", "sector": "IT"},
+    {"symbol": "HDFCBANK", "isin": "INE040A01034", "sector": "BANKING"}
+  ],
+  "coverage": {}
+}
